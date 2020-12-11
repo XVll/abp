@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Volo.Abp;
 using Volo.Abp.EntityFrameworkCore.Modeling;
@@ -28,20 +27,16 @@ namespace Volo.CmsKit.EntityFrameworkCore
 
             optionsAction?.Invoke(options);
 
-            //TODO: What if only CMSKit Pro features are enabled? This is kinda workaround for now
-            if (GlobalFeatureManager.Instance.Modules.CmsKit().GetFeatures().Any(f => f.IsEnabled))
+            builder.Entity<CmsUser>(b =>
             {
-                builder.Entity<CmsUser>(b =>
-                {
-                    b.ToTable(options.TablePrefix + "Users", options.Schema);
+                b.ToTable(options.TablePrefix + "Users", options.Schema);
 
-                    b.ConfigureByConvention();
-                    b.ConfigureAbpUser();
+                b.ConfigureByConvention();
+                b.ConfigureAbpUser();
 
-                    b.HasIndex(x => new {x.TenantId, x.UserName});
-                    b.HasIndex(x => new {x.TenantId, x.Email});
-                });
-            }
+                b.HasIndex(x => new {x.TenantId, x.UserName});
+                b.HasIndex(x => new {x.TenantId, x.Email});
+            });
 
             if (GlobalFeatureManager.Instance.IsEnabled<ReactionsFeature>())
             {
@@ -91,7 +86,7 @@ namespace Volo.CmsKit.EntityFrameworkCore
                     r.Property(x => x.EntityId).IsRequired().HasMaxLength(RatingConsts.MaxEntityIdLength);
 
                     r.HasIndex(x => new {x.TenantId, x.EntityType, x.EntityId, x.CreatorId});
-                });
+                });    
             }
         }
     }

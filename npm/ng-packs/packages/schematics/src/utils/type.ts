@@ -1,7 +1,7 @@
-import { SYSTEM_TYPES, VOLO_REGEX } from '../constants';
+import { SYSTEM_TYPES } from '../constants';
+import { VOLO_REGEX } from '../constants/volo';
 import { eImportKeyword } from '../enums';
 import { Import, TypeWithEnum } from '../models';
-import { extractSimpleGenerics } from './generics';
 import { parseNamespace } from './namespace';
 import { relativePathToEnum, relativePathToModel } from './path';
 import { parseGenerics } from './tree';
@@ -15,9 +15,14 @@ export function createTypeSimplifier() {
 
     type = /any</.test(type) ? 'any' : type;
 
-    const { identifier, generics } = extractSimpleGenerics(type);
+    const regexp = new RegExp(/.*(?<=\.)(?<generic>.+)<.*(?<=[\.<])(?<genericType>.+)>/gm);
+    const { generic, genericType } = regexp.exec(type)?.groups ?? {};
 
-    return generics.length ? `${identifier}<${generics.join(', ')}>` : identifier;
+    return generic
+      ? generic === 'any'
+        ? 'any'
+        : `${generic}<${genericType}>`
+      : type.split('.').pop()!;
   });
 
   return (type: string) => {
@@ -35,7 +40,9 @@ export function createTypeParser(replacerFn = (t: string) => t) {
 
 export function createTypeNormalizer(replacerFn = (t: string) => t) {
   return (type: string) => {
-    return replacerFn(normalizeTypeAnnotations(type));
+    type = normalizeTypeAnnotations(type);
+
+    return replacerFn(type);
   };
 }
 
@@ -49,7 +56,8 @@ export function flattenDictionaryTypes(types: string[], type: string) {
 }
 
 export function normalizeTypeAnnotations(type: string) {
-  return type.replace(/\[(.+)+\]/g, '$1[]').replace(/\?/g, '');
+  type = type.replace(/\[(.+)+\]/g, '$1[]');
+  return type.replace(/\?/g, '');
 }
 
 export function removeGenerics(type: string) {
@@ -106,9 +114,4 @@ export function createTypeToImportMapper(solution: string, namespace: string) {
 export function createTypeAdapter() {
   const simplifyType = createTypeSimplifier();
   return (type: string) => parseGenerics(type, node => simplifyType(node.data)).toString();
-}
-
-// naming here is depictive only
-export function extendsSelf(type: string, base: string) {
-  return removeGenerics(base) === removeGenerics(type);
 }

@@ -59,18 +59,22 @@ namespace Volo.Abp.Cli.Licensing
 
             using (var client = new CliHttpClient())
             {
-                using (var response = await client.GetHttpResponseMessageWithRetryAsync(url, CancellationTokenProvider.Token, _logger))
+                var response = await client.GetHttpResponseMessageWithRetryAsync(
+                    url: url,
+                    cancellationToken: CancellationTokenProvider.Token,
+                    logger: _logger);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new Exception($"ERROR: Remote server returns '{response.StatusCode}'");
-                    }
-
-                    await RemoteServiceExceptionHandler.EnsureSuccessfulHttpResponseAsync(response);
-
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    return JsonSerializer.Deserialize<DeveloperApiKeyResult>(responseContent);
+                    throw new Exception($"ERROR: Remote server returns '{response.StatusCode}'");
                 }
+
+                await RemoteServiceExceptionHandler.EnsureSuccessfulHttpResponseAsync(response);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var apiKeyResult = JsonSerializer.Deserialize<DeveloperApiKeyResult>(responseContent);
+
+                return apiKeyResult;
             }
         }
     }

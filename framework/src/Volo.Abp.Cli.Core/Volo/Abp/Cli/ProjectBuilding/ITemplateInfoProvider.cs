@@ -1,11 +1,10 @@
-﻿using System.Threading.Tasks;
-using Volo.Abp.Cli.ProjectBuilding.Building;
+﻿using Volo.Abp.Cli.ProjectBuilding.Building;
 
 namespace Volo.Abp.Cli.ProjectBuilding
 {
     public interface ITemplateInfoProvider
     {
-        Task<TemplateInfo> GetDefaultAsync();
+        TemplateInfo GetDefault();
 
         TemplateInfo Get(string name);
     }

@@ -81,18 +81,22 @@ namespace Volo.Abp.Cli.Commands
 
             using (var client = new CliHttpClient())
             {
-                using (var response = await client.GetHttpResponseMessageWithRetryAsync(url, CancellationTokenProvider.Token, Logger))
+                var response = await client.GetHttpResponseMessageWithRetryAsync(
+                    url,
+                    CancellationTokenProvider.Token,
+                    Logger);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new Exception($"ERROR: Remote server returns '{response.StatusCode}'");
-                    }
-
-                    await RemoteServiceExceptionHandler.EnsureSuccessfulHttpResponseAsync(response);
-
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    return JsonSerializer.Deserialize<bool>(responseContent);
+                    throw new Exception($"ERROR: Remote server returns '{response.StatusCode}'");
                 }
+
+                await RemoteServiceExceptionHandler.EnsureSuccessfulHttpResponseAsync(response);
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<bool>(responseContent);
+
+                return result;
             }
         }
 

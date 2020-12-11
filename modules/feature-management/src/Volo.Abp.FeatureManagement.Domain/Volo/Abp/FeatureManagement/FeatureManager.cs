@@ -132,7 +132,7 @@ namespace Volo.Abp.FeatureManagement
 
             var feature = FeatureDefinitionManager.Get(name);
 
-            if (feature?.ValueType?.Validator.IsValid(value) == false)
+            if (!feature.ValueType.Validator.IsValid(value))
             {
                 throw new FeatureValueInvalidException(feature.DisplayName.Localize(StringLocalizerFactory));
             }

@@ -11,11 +11,11 @@ namespace Volo.Abp.IdentityServer.Tokens
         protected TokenCleanupOptions Options { get; }
 
         public TokenCleanupBackgroundWorker(
-            AbpAsyncTimer timer,
+            AbpTimer timer, 
             IServiceScopeFactory serviceScopeFactory,
             IOptions<TokenCleanupOptions> options)
             : base(
-                timer,
+                timer, 
                 serviceScopeFactory)
         {
             Options = options.Value;
@@ -27,7 +27,8 @@ namespace Volo.Abp.IdentityServer.Tokens
             await workerContext
                 .ServiceProvider
                 .GetRequiredService<TokenCleanupService>()
-                .CleanAsync();
+                .CleanAsync()
+                ;
         }
     }
 }

@@ -20,7 +20,7 @@ namespace Volo.Abp.RabbitMQ
 
         protected IExceptionNotifier ExceptionNotifier { get; }
 
-        protected AbpAsyncTimer Timer { get; }
+        protected AbpTimer Timer { get; }
 
         protected ExchangeDeclareConfiguration Exchange { get; private set; }
 
@@ -38,7 +38,7 @@ namespace Volo.Abp.RabbitMQ
 
         public RabbitMqMessageConsumer(
             IConnectionPool connectionPool,
-            AbpAsyncTimer timer,
+            AbpTimer timer, 
             IExceptionNotifier exceptionNotifier)
         {
             ConnectionPool = connectionPool;
@@ -50,7 +50,7 @@ namespace Volo.Abp.RabbitMQ
             Callbacks = new ConcurrentBag<Func<IModel, BasicDeliverEventArgs, Task>>();
 
             Timer.Period = 5000; //5 sec.
-            Timer.Elapsed = Timer_Elapsed;
+            Timer.Elapsed += Timer_Elapsed;
             Timer.RunOnStart = true;
         }
 
@@ -77,7 +77,7 @@ namespace Volo.Abp.RabbitMQ
             await TrySendQueueBindCommandsAsync();
         }
 
-        protected virtual async Task TrySendQueueBindCommandsAsync()
+        protected virtual void TrySendQueueBindCommands()
         {
             try
             {
@@ -119,8 +119,14 @@ namespace Volo.Abp.RabbitMQ
             catch (Exception ex)
             {
                 Logger.LogException(ex, LogLevel.Warning);
-                await ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning);
+                AsyncHelper.RunSync(() => ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning));
             }
+        }
+
+        protected virtual Task TrySendQueueBindCommandsAsync()
+        {
+            TrySendQueueBindCommands();
+            return Task.CompletedTask;
         }
 
         public virtual void OnMessageReceived(Func<IModel, BasicDeliverEventArgs, Task> callback)
@@ -128,24 +134,25 @@ namespace Volo.Abp.RabbitMQ
             Callbacks.Add(callback);
         }
 
-        protected virtual async Task Timer_Elapsed(AbpAsyncTimer timer)
+        protected virtual void Timer_Elapsed(object sender, EventArgs e)
         {
             if (Channel == null || Channel.IsOpen == false)
             {
-                await TryCreateChannelAsync();
-                await TrySendQueueBindCommandsAsync();
+                TryCreateChannel();
+                TrySendQueueBindCommands();
             }
         }
 
-        protected virtual async Task TryCreateChannelAsync()
+        protected virtual void TryCreateChannel()
         {
-            await DisposeChannelAsync();
+            DisposeChannel();
 
             try
             {
                 var channel = ConnectionPool
                     .Get(ConnectionName)
                     .CreateModel();
+
                 channel.ExchangeDeclare(
                     exchange: Exchange.ExchangeName,
                     type: Exchange.Type,
@@ -165,7 +172,7 @@ namespace Volo.Abp.RabbitMQ
                 var consumer = new EventingBasicConsumer(channel);
                 consumer.Received += async (model, basicDeliverEventArgs) =>
                 {
-                    await HandleIncomingMessageAsync(channel, basicDeliverEventArgs);
+                    await HandleIncomingMessage(channel, basicDeliverEventArgs);
                 };
 
                 channel.BasicConsume(
@@ -179,11 +186,11 @@ namespace Volo.Abp.RabbitMQ
             catch (Exception ex)
             {
                 Logger.LogException(ex, LogLevel.Warning);
-                await ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning);
+                AsyncHelper.RunSync(() => ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning));
             }
         }
 
-        protected virtual async Task HandleIncomingMessageAsync(IModel channel, BasicDeliverEventArgs basicDeliverEventArgs)
+        protected virtual async Task HandleIncomingMessage(IModel channel, BasicDeliverEventArgs basicDeliverEventArgs)
         {
             try
             {
@@ -198,24 +205,6 @@ namespace Volo.Abp.RabbitMQ
             {
                 Logger.LogException(ex);
                 await ExceptionNotifier.NotifyAsync(ex);
-            }
-        }
-
-        protected virtual async Task DisposeChannelAsync()
-        {
-            if (Channel == null)
-            {
-                return;
-            }
-
-            try
-            {
-                Channel.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogException(ex, LogLevel.Warning);
-                await ExceptionNotifier.NotifyAsync(ex, logLevel: LogLevel.Warning);
             }
         }
 

@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Volo.Abp.Cli.Args;
-using Volo.Abp.Cli.Bundling;
 using Volo.Abp.Cli.Commands;
 using Volo.Abp.Cli.Commands.Services;
 using Volo.Abp.Cli.Http;
@@ -36,7 +35,6 @@ namespace Volo.Abp.Cli.ProjectModification
         public NugetPackageToLocalReferenceConverter NugetPackageToLocalReferenceConverter { get; }
         public AngularModuleSourceCodeAdder AngularModuleSourceCodeAdder { get; }
         public NewCommand NewCommand { get; }
-        public BundleCommand BundleCommand { get; }
 
         public SolutionModuleAdder(
             IJsonSerializer jsonSerializer,
@@ -51,8 +49,7 @@ namespace Volo.Abp.Cli.ProjectModification
             SolutionFileModifier solutionFileModifier,
             NugetPackageToLocalReferenceConverter nugetPackageToLocalReferenceConverter,
             AngularModuleSourceCodeAdder angularModuleSourceCodeAdder,
-            NewCommand newCommand,
-            BundleCommand bundleCommand)
+            NewCommand newCommand)
         {
             JsonSerializer = jsonSerializer;
             ProjectNugetPackageAdder = projectNugetPackageAdder;
@@ -67,7 +64,6 @@ namespace Volo.Abp.Cli.ProjectModification
             NugetPackageToLocalReferenceConverter = nugetPackageToLocalReferenceConverter;
             AngularModuleSourceCodeAdder = angularModuleSourceCodeAdder;
             NewCommand = newCommand;
-            BundleCommand = bundleCommand;
             Logger = NullLogger<SolutionModuleAdder>.Instance;
         }
 
@@ -122,33 +118,15 @@ namespace Volo.Abp.Cli.ProjectModification
                 await AddAngularPackages(solutionFile, module);
             }
 
-            await RunBundleForBlazorAsync(projectFiles, module);
-
             ModifyDbContext(projectFiles, module, startupProject, skipDbMigrations);
-        }
-
-        private async Task RunBundleForBlazorAsync(string[] projectFiles, ModuleWithMastersInfo module)
-        {
-            var blazorProject = projectFiles.FirstOrDefault(f => f.EndsWith(".Blazor.csproj"));
-
-            if (blazorProject == null || !module.NugetPackages.Any(np=> np.Target == NuGetPackageTarget.Blazor))
-            {
-                return;
-            }
-
-            var args = new CommandLineArgs("bundle");
-
-            args.Options.Add(BundleCommand.Options.WorkingDirectory.Short, Path.GetDirectoryName(blazorProject));
-            args.Options.Add(BundleCommand.Options.ForceBuild.Short, string.Empty);
-
-            await BundleCommand.ExecuteAsync(args);
         }
 
         private async Task RemoveUnnecessaryProjectsAsync(string solutionDirectory, ModuleWithMastersInfo module,
             string[] projectFiles)
         {
             var moduleDirectory = Path.Combine(solutionDirectory, "modules", module.Name);
-            var moduleSolutionFile = Directory.GetFiles(moduleDirectory, "*.sln", SearchOption.TopDirectoryOnly).First();
+            var moduleSolutionFile =
+                Directory.GetFiles(moduleDirectory, "*.sln", SearchOption.TopDirectoryOnly).First();
             var isProjectTiered = await IsProjectTiered(projectFiles);
 
             if (!projectFiles.Any(p => p.EndsWith(".Blazor.csproj")))
@@ -171,7 +149,6 @@ namespace Volo.Abp.Cli.ProjectModification
             {
                 await RemoveProjectByTarget(module, moduleSolutionFile, NuGetPackageTarget.EntityFrameworkCore, isProjectTiered);
                 await RemoveProjectByPostFix(module, moduleSolutionFile, "test", ".EntityFrameworkCore.Tests");
-                await ChangeDomainTestReferenceToMongoDB(module, moduleSolutionFile);
             }
         }
 
@@ -186,11 +163,6 @@ namespace Volo.Abp.Cli.ProjectModification
 
             foreach (var package in packages)
             {
-                if (target == NuGetPackageTarget.Web && package.Name.StartsWith("Volo.Abp.Account"))
-                {
-                    continue;
-                }
-
                 await SolutionFileModifier.RemoveProjectFromSolutionFileAsync(moduleSolutionFile, package.Name);
 
                 var projectPath = Path.Combine(Path.GetDirectoryName(moduleSolutionFile), "src", package.Name);
@@ -206,27 +178,12 @@ namespace Volo.Abp.Cli.ProjectModification
         {
             var srcPath = Path.Combine(Path.GetDirectoryName(moduleSolutionFile), targetFolder);
             var projectFolderPath = Directory.GetDirectories(srcPath).FirstOrDefault(d=> d.EndsWith(postFix));
-            await SolutionFileModifier.RemoveProjectFromSolutionFileAsync(moduleSolutionFile, new DirectoryInfo(projectFolderPath).Name);
+            await SolutionFileModifier.RemoveProjectFromSolutionFileAsync(moduleSolutionFile, Path.GetDirectoryName(projectFolderPath));
 
             if (Directory.Exists(projectFolderPath))
             {
                 Directory.Delete(projectFolderPath, true);
             }
-
-        }
-
-        private async Task ChangeDomainTestReferenceToMongoDB(ModuleWithMastersInfo module, string moduleSolutionFile)
-        {
-            var srcPath = Path.Combine(Path.GetDirectoryName(moduleSolutionFile), "test");
-            var projectFolderPath = Directory.GetDirectories(srcPath).FirstOrDefault(d=> d.EndsWith("Domain.Tests"));
-
-            var csprojFile = Directory.GetFiles(projectFolderPath).First(p => p.EndsWith(".csproj"));
-            var moduleFile = Directory.GetFiles(projectFolderPath).First(p => p.EndsWith("DomainTestModule.cs"));
-
-            File.WriteAllText(csprojFile, File.ReadAllText(csprojFile).Replace("EntityFrameworkCore","MongoDB"));
-            File.WriteAllText(moduleFile, File.ReadAllText(moduleFile)
-                .Replace(".EntityFrameworkCore;",".MongoDB;")
-                .Replace("EntityFrameworkCoreTestModule","MongoDbTestModule"));
         }
 
         private async Task AddAngularPackages(string solutionFilePath, ModuleWithMastersInfo module)
@@ -299,9 +256,7 @@ namespace Volo.Abp.Cli.ProjectModification
                 );
             }
 
-            await DeleteRedundantHostProjects(targetModuleFolder,"app");
-            await DeleteRedundantHostProjects(targetModuleFolder,"demo");
-            await DeleteRedundantHostProjects(targetModuleFolder,"host");
+            await DeleteAppAndDemoFolderAsync(targetModuleFolder);
 
             if (module.MasterModuleInfos == null)
             {
@@ -326,22 +281,24 @@ namespace Volo.Abp.Cli.ProjectModification
             await NewCommand.ExecuteAsync(args);
         }
 
-        private async Task DeleteRedundantHostProjects(string targetModuleFolder, string folderName)
+        private async Task DeleteAppAndDemoFolderAsync(string targetModuleFolder)
         {
-            var moduleSolutionFile = Directory.GetFiles(targetModuleFolder, "*.sln", SearchOption.TopDirectoryOnly).First();
-
-            var folder = Path.Combine(targetModuleFolder, folderName);
-            if (Directory.Exists(folder))
+            var appFolder = Path.Combine(targetModuleFolder, "app");
+            if (Directory.Exists(appFolder))
             {
-                var projects = Directory.GetDirectories(folder);
+                Directory.Delete(appFolder, true);
+            }
 
-                foreach (var project in projects)
-                {
-                    await SolutionFileModifier.RemoveProjectFromSolutionFileAsync(moduleSolutionFile,
-                        new DirectoryInfo(project).Name);
-                }
+            var demoFolder = Path.Combine(targetModuleFolder, "demo");
+            if (Directory.Exists(demoFolder))
+            {
+                Directory.Delete(demoFolder, true);
+            }
 
-                Directory.Delete(folder, true);
+            var hostFolder = Path.Combine(targetModuleFolder, "host");
+            if (Directory.Exists(hostFolder))
+            {
+                Directory.Delete(hostFolder, true);
             }
         }
 
@@ -487,76 +444,73 @@ namespace Volo.Abp.Cli.ProjectModification
         private async Task<ModuleWithMastersInfo> GetEmptyModuleProjectInfoAsync(string moduleName,
             bool newProTemplate = false)
         {
-            var module = new ModuleWithMastersInfo
-            {
-                Name = moduleName,
-                DisplayName = moduleName,
-                MasterModuleInfos = new List<ModuleWithMastersInfo>()
-            };
+            var module = new ModuleWithMastersInfo();
 
-            var moduleProjectName = module.Name.Split('.').Last();
-            module.EfCoreConfigureMethodName = $"{module.Name}.EntityFrameworkCore:Configure{moduleProjectName}";
+            module.Name = moduleName;
+            module.DisplayName = moduleName;
+            module.EfCoreConfigureMethodName = $"{module.Name}.EntityFrameworkCore:Configure{module.Name}";
+            module.MasterModuleInfos = new List<ModuleWithMastersInfo>();
 
             module.NugetPackages = new List<NugetPackageInfo>
             {
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.Application",
-                    ModuleClass = $"{module.Name}.{moduleProjectName}ApplicationModule",
+                    ModuleClass = $"{module.Name}.{module.Name}ApplicationModule",
                     Target = NuGetPackageTarget.Application
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.Application.Contracts",
-                    ModuleClass = $"{module.Name}.{moduleProjectName}ApplicationContractsModule",
+                    ModuleClass = $"{module.Name}.{module.Name}ApplicationContractsModule",
                     Target = NuGetPackageTarget.ApplicationContracts
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.Blazor",
-                    ModuleClass = $"{module.Name}.Blazor.{moduleProjectName}BlazorModule",
+                    ModuleClass = $"{module.Name}.Blazor.{module.Name}BlazorModule",
                     Target = NuGetPackageTarget.Blazor
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.Domain",
-                    ModuleClass = $"{module.Name}.{moduleProjectName}DomainModule",
+                    ModuleClass = $"{module.Name}.{module.Name}DomainModule",
                     Target = NuGetPackageTarget.Domain
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.Domain.Shared",
-                    ModuleClass = $"{module.Name}.{moduleProjectName}DomainSharedModule",
+                    ModuleClass = $"{module.Name}.{module.Name}DomainSharedModule",
                     Target = NuGetPackageTarget.DomainShared
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.EntityFrameworkCore",
-                    ModuleClass = $"{module.Name}.EntityFrameworkCore.{moduleProjectName}EntityFrameworkCoreModule",
+                    ModuleClass = $"{module.Name}.EntityFrameworkCore.{module.Name}EntityFrameworkCoreModule",
                     Target = NuGetPackageTarget.EntityFrameworkCore
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.HttpApi",
-                    ModuleClass = $"{module.Name}.{moduleProjectName}HttpApiModule",
+                    ModuleClass = $"{module.Name}.{module.Name}HttpApiModule",
                     Target = NuGetPackageTarget.HttpApi
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.HttpApi.Client",
-                    ModuleClass = $"{module.Name}.{moduleProjectName}HttpApiClientModule",
+                    ModuleClass = $"{module.Name}.{module.Name}HttpApiClientModule",
                     Target = NuGetPackageTarget.HttpApiClient
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.MongoDB",
-                    ModuleClass = $"{module.Name}.MongoDB.{moduleProjectName}MongoDbModule",
+                    ModuleClass = $"{module.Name}.MongoDB.{module.Name}MongoDbModule",
                     Target = NuGetPackageTarget.MongoDB
                 },
                 new NugetPackageInfo
                 {
                     Name = $"{module.Name}.Web",
-                    ModuleClass = $"{module.Name}.Web.{moduleProjectName}WebModule",
+                    ModuleClass = $"{module.Name}.Web.{module.Name}WebModule",
                     Target = NuGetPackageTarget.Web
                 },
             };
@@ -569,9 +523,7 @@ namespace Volo.Abp.Cli.ProjectModification
         protected virtual async Task<bool> IsProjectTiered(string[] projectFiles)
         {
             return projectFiles.Select(ProjectFileNameHelper.GetAssemblyNameFromProjectPath)
-                .Any(p =>p.EndsWith(".HttpApi.Host"))
-                && projectFiles.Select(ProjectFileNameHelper.GetAssemblyNameFromProjectPath)
-                .Any(p => p.EndsWith(".IdentityServer"));
+                .Any(p => p.EndsWith(".IdentityServer") || p.EndsWith(".HttpApi.Host"));
         }
     }
 }

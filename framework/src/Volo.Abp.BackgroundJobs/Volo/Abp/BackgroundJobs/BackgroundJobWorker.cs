@@ -17,7 +17,7 @@ namespace Volo.Abp.BackgroundJobs
         protected AbpBackgroundJobWorkerOptions WorkerOptions { get; }
 
         public BackgroundJobWorker(
-            AbpAsyncTimer timer,
+            AbpTimer timer,
             IOptions<AbpBackgroundJobOptions> jobOptions,
             IOptions<AbpBackgroundJobWorkerOptions> workerOptions,
             IServiceScopeFactory serviceScopeFactory)

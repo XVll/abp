@@ -11,15 +11,15 @@ namespace Volo.Abp.BackgroundWorkers
     public abstract class AsyncPeriodicBackgroundWorkerBase : BackgroundWorkerBase
     {
         protected IServiceScopeFactory ServiceScopeFactory { get; }
-        protected AbpAsyncTimer Timer { get; }
+        protected AbpTimer Timer { get; }
 
         protected AsyncPeriodicBackgroundWorkerBase(
-            AbpAsyncTimer timer,
+            AbpTimer timer,
             IServiceScopeFactory serviceScopeFactory)
         {
             ServiceScopeFactory = serviceScopeFactory;
             Timer = timer;
-            Timer.Elapsed = Timer_Elapsed;
+            Timer.Elapsed += Timer_Elapsed;
         }
 
         public async override Task StartAsync(CancellationToken cancellationToken = default)
@@ -34,24 +34,23 @@ namespace Volo.Abp.BackgroundWorkers
             await base.StopAsync(cancellationToken);
         }
 
-        private async Task Timer_Elapsed(AbpAsyncTimer timer)
-        {
-            await DoWorkAsync();
-        }
-
-        private async Task DoWorkAsync()
+        private void Timer_Elapsed(object sender, System.EventArgs e)
         {
             using (var scope = ServiceScopeFactory.CreateScope())
             {
                 try
                 {
-                    await DoWorkAsync(new PeriodicBackgroundWorkerContext(scope.ServiceProvider));
+                    AsyncHelper.RunSync(
+                        () => DoWorkAsync(new PeriodicBackgroundWorkerContext(scope.ServiceProvider))
+                    );
                 }
                 catch (Exception ex)
                 {
-                    await scope.ServiceProvider
-                        .GetRequiredService<IExceptionNotifier>()
-                        .NotifyAsync(new ExceptionNotificationContext(ex));
+                    AsyncHelper.RunSync(
+                        () => scope.ServiceProvider
+                            .GetRequiredService<IExceptionNotifier>()
+                            .NotifyAsync(new ExceptionNotificationContext(ex))
+                    );
 
                     Logger.LogException(ex);
                 }

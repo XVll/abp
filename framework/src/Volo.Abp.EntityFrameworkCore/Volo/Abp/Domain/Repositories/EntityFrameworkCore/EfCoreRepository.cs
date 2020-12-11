@@ -30,7 +30,7 @@ namespace Volo.Abp.Domain.Repositories.EntityFrameworkCore
         private readonly IDbContextProvider<TDbContext> _dbContextProvider;
         private readonly Lazy<AbpEntityOptions<TEntity>> _entityOptionsLazy;
 
-        public virtual IGuidGenerator GuidGenerator { get; set; }
+        protected virtual IGuidGenerator GuidGenerator { get; set; }
 
         public EfCoreRepository(IDbContextProvider<TDbContext> dbContextProvider)
         {

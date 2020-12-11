@@ -87,9 +87,9 @@ namespace Volo.Docs.Documents
             Contributors = new List<DocumentContributor>();
         }
 
-        public virtual void AddContributor(string username, string userProfileUrl, string avatarUrl, int commitCount = 1)
+        public virtual void AddContributor(string username, string userProfileUrl, string avatarUrl)
         {
-            Contributors.AddIfNotContains(new DocumentContributor(Id, username, userProfileUrl, avatarUrl, commitCount));
+            Contributors.AddIfNotContains(new DocumentContributor(Id, username, userProfileUrl, avatarUrl));
         }
 
         public virtual void RemoveAllContributors()

@@ -1429,7 +1429,6 @@ Here the complete code to create the book management CRUD page, that has been de
         <DataGrid TItem="BookDto"
                   Data="Entities"
                   ReadData="OnDataGridReadAsync"
-                  CurrentPage="CurrentPage"
                   TotalItems="TotalCount"
                   ShowPager="true"
                   PageSize="PageSize">

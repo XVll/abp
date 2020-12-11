@@ -5,7 +5,6 @@ export * from './barrel';
 export * from './common';
 export * from './enum';
 export * from './file';
-export * from './generics';
 export * from './import';
 export * from './model';
 export * from './namespace';

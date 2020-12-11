@@ -43,12 +43,14 @@ namespace Volo.Abp.BackgroundWorkers
             {
                 try
                 {
+
                     DoWork(new PeriodicBackgroundWorkerContext(scope.ServiceProvider));
                 }
                 catch (Exception ex)
                 {
-                    var exceptionNotifier = scope.ServiceProvider.GetRequiredService<IExceptionNotifier>();
-                    AsyncHelper.RunSync(() => exceptionNotifier.NotifyAsync(new ExceptionNotificationContext(ex)));
+                    scope.ServiceProvider
+                        .GetRequiredService<IExceptionNotifier>()
+                        .NotifyAsync(new ExceptionNotificationContext(ex));
 
                     Logger.LogException(ex);
                 }

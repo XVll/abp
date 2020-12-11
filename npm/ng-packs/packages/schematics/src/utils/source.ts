@@ -36,7 +36,7 @@ async function getApiDefinition(sourceUrl: string) {
   } catch ({ response }) {
     // handle redirects
     if (!response?.body || response.statusCode >= 400)
-      throw new SchematicsException(interpolate(Exception.NoApi, url));
+      throw new SchematicsException(Exception.NoApi);
 
     body = response.body;
   }

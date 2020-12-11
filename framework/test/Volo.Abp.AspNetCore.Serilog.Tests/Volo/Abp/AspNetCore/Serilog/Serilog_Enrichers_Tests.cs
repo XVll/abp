@@ -88,7 +88,7 @@ namespace Volo.Abp.AspNetCore.Serilog
             executedLogEvent.ShouldNotBeNull();
 
             executedLogEvent.Properties.ContainsKey(_serilogOptions.EnricherPropertyNames.CorrelationId)
-                .ShouldBeTrue();
+                .ShouldNotBeNull();
 
             ((ScalarValue) executedLogEvent.Properties[_serilogOptions.EnricherPropertyNames.CorrelationId]).Value
                 .ShouldBe(result);

@@ -34,25 +34,24 @@ namespace Volo.Abp.Cli.Commands
 
             var directory = commandLineArgs.Options.GetOrNull(Options.SolutionPath.Short, Options.SolutionPath.Long) ??
                             Directory.GetCurrentDirectory();
-            var version = commandLineArgs.Options.GetOrNull(Options.Version.Short, Options.Version.Long);
 
             if (updateNuget || !updateNpm)
             {
-                await UpdateNugetPackages(commandLineArgs, directory, version);
+                await UpdateNugetPackages(commandLineArgs, directory);
             }
 
             if (updateNpm || !updateNuget)
             {
-                await UpdateNpmPackages(directory, version);
+                await UpdateNpmPackages(directory);
             }
         }
 
-        private async Task UpdateNpmPackages(string directory, string version)
+        private async Task UpdateNpmPackages(string directory)
         {
-            await _npmPackagesUpdater.Update(directory, version: version);
+            await _npmPackagesUpdater.Update(directory);
         }
 
-        private async Task UpdateNugetPackages(CommandLineArgs commandLineArgs, string directory, string version)
+        private async Task UpdateNugetPackages(CommandLineArgs commandLineArgs, string directory)
         {
 
             var solution = commandLineArgs.Options.GetOrNull(Options.SolutionName.Short, Options.SolutionName.Long);
@@ -67,7 +66,7 @@ namespace Volo.Abp.Cli.Commands
             {
                 var solutionName = Path.GetFileName(solution).RemovePostFix(".sln");
 
-                await _nugetPackagesVersionUpdater.UpdateSolutionAsync(solution, checkAll: checkAll, version: version);
+                await _nugetPackagesVersionUpdater.UpdateSolutionAsync(solution, checkAll: checkAll);
 
                 Logger.LogInformation($"Volo packages are updated in {solutionName} solution.");
                 return;
@@ -79,7 +78,7 @@ namespace Volo.Abp.Cli.Commands
             {
                 var projectName = Path.GetFileName(project).RemovePostFix(".csproj");
 
-                await _nugetPackagesVersionUpdater.UpdateProjectAsync(project, checkAll: checkAll, version: version);
+                await _nugetPackagesVersionUpdater.UpdateProjectAsync(project, checkAll: checkAll);
 
                 Logger.LogInformation($"Volo packages are updated in {projectName} project.");
                 return;
@@ -108,7 +107,6 @@ namespace Volo.Abp.Cli.Commands
             sb.AppendLine("-sp|--solution-path                         (Specify the solution path)");
             sb.AppendLine("-sn|--solution-name                         (Specify the solution name)");
             sb.AppendLine("--check-all                                 (Check the new version of each package separately)");
-            sb.AppendLine("-v|--version <version>                      (default: latest version)");
             sb.AppendLine("");
             sb.AppendLine("Some examples:");
             sb.AppendLine("");
@@ -149,12 +147,6 @@ namespace Volo.Abp.Cli.Commands
             public static class CheckAll
             {
                 public const string Long = "check-all";
-            }
-
-            public static class Version
-            {
-                public const string Short = "v";
-                public const string Long = "version";
             }
         }
     }

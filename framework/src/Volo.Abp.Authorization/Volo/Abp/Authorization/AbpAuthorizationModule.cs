@@ -3,20 +3,17 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Volo.Abp.Authorization.Localization;
 using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Localization;
-using Volo.Abp.Localization.ExceptionHandling;
 using Volo.Abp.Modularity;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Security;
-using Volo.Abp.VirtualFileSystem;
 
 namespace Volo.Abp.Authorization
 {
     [DependsOn(
         typeof(AbpSecurityModule),
-        typeof(AbpLocalizationModule),
+        typeof(AbpLocalizationAbstractionsModule),
         typeof(AbpMultiTenancyModule)
         )]
     public class AbpAuthorizationModule : AbpModule
@@ -40,23 +37,6 @@ namespace Volo.Abp.Authorization
                 options.ValueProviders.Add<UserPermissionValueProvider>();
                 options.ValueProviders.Add<RolePermissionValueProvider>();
                 options.ValueProviders.Add<ClientPermissionValueProvider>();
-            });
-
-            Configure<AbpVirtualFileSystemOptions>(options =>
-            {
-                options.FileSets.AddEmbedded<AbpAuthorizationResource>();
-            });
-
-            Configure<AbpLocalizationOptions>(options =>
-            {
-                options.Resources
-                    .Add<AbpAuthorizationResource>("en")
-                    .AddVirtualJson("/Volo/Abp/Authorization/Localization");
-            });
-
-            Configure<AbpExceptionLocalizationOptions>(options =>
-            {
-                options.MapCodeNamespace("Volo.Authorization", typeof(AbpAuthorizationResource));
             });
         }
 
