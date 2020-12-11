@@ -17,6 +17,8 @@ namespace Volo.Abp.Identity
                 .ForMember(dest => dest.HasPassword,
                     op => op.MapFrom(src => src.PasswordHash != null))
                 .MapExtraProperties();
+            CreateMap<IdentityClaimType, IdentityClaimTypeDto>()
+                .MapExtraProperties();
         }
     }
 }

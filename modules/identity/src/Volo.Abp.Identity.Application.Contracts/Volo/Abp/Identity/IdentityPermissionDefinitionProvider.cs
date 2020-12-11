@@ -10,6 +10,11 @@ namespace Volo.Abp.Identity
         {
             var identityGroup = context.AddGroup(IdentityPermissions.GroupName, L("Permission:IdentityManagement"));
 
+            var claimTypePermission = identityGroup.AddPermission(IdentityPermissions.ClaimType.Default, L("Permission:UserClaimTypeManagement"));
+            claimTypePermission.AddChild(IdentityPermissions.ClaimType.Create, L("Permission:Create"));
+            claimTypePermission.AddChild(IdentityPermissions.ClaimType.Update, L("Permission:Edit"));
+            claimTypePermission.AddChild(IdentityPermissions.ClaimType.Delete, L("Permission:Delete"));
+
             var rolesPermission = identityGroup.AddPermission(IdentityPermissions.Roles.Default, L("Permission:RoleManagement"));
             rolesPermission.AddChild(IdentityPermissions.Roles.Create, L("Permission:Create"));
             rolesPermission.AddChild(IdentityPermissions.Roles.Update, L("Permission:Edit"));

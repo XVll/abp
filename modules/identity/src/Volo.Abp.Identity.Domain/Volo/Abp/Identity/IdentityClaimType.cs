@@ -44,5 +44,16 @@ namespace Volo.Abp.Identity
             Description = description;
             ValueType = valueType;
         }
+
+        public virtual IdentityClaimType SetName([NotNull] string name)
+        {
+            Name = Check.NotNullOrWhiteSpace(name, nameof(Name));
+            return this;
+        }
+        public virtual IdentityClaimType SetValueType(IdentityClaimValueType valueType)
+        {
+            ValueType = valueType;
+            return this;
+        }
     }
 }
